@@ -1,0 +1,18 @@
+# Build outputs and private diagnostics
+/build/
+/release/
+/evidence/
+*.o
+*.obj
+*.exe
+*.dll
+*.pdb
+*.ilk
+*.log
+*.dmp
+*.mdmp
+*.hdmp
+*.bin
+*.zip
+.vs/
+.vscode/
