@@ -1,14 +1,11 @@
-# Security review notes
+# Security review notes — 0.3.0
 
-Version 0.2.0, Windows x64.
+Windows x64 native runtime plugin. DLL SHA256: 558E5822C20E433C776B2B499FCDC9B5D442BDB1BCC91FEEE68B596D957A7F03
 
-Purpose: force two native EDF6 performance policies.
-DLL SHA256: 8F5EADFDA9EE70887F73C246E09D0A30EAE981BC3BAD488DADC0769C5F54C01E
+The plugin uses current-process MinHook detours: two for native Full Lightweight Mode, two for generator-origin remains acceptance and three for egg-shell creation/lifecycle bookkeeping. Features select their hooks independently, up to seven when all enabled. Necessary executable-memory changes and coordination of game-process threads remain part of this implementation.
 
-The only dynamic code changes are the four documented current-process MinHook detours, selected by the two feature settings. Native Full and acceptance setters perform policy changes; existing game code handles resource cleanup. Memory reads use GetCurrentProcess(). MinHook enumerates and coordinates threads owned by that same process. No remote-process injection, network client, credential collection, autostart, security-product tampering, obfuscator or packer is implemented. This is a source/PE review statement, not an antivirus scan certificate.
+Startup reads the adjacent INI, optionally opens EDF6GeneratorBodyBudget.log, validates EDF.dll SHA256 and the byte windows needed by enabled features, installs the selected hooks and exits. There is no periodic background game-pointer polling worker. Logging is append-only and bounded to approximately 2 MiB; disabled logging does not create or write a log and does not delete an old one.
 
-The startup thread reads the adjacent INI, optionally opens an adjacent status log, checks EDF.dll SHA256 and required bytes, installs selected hooks, and exits. No periodic game-pointer polling thread remains. The optional log is append-only and bounded; a log-open failure does not disable the plugin.
+The supplied implementation has no network client, downloader, remote-process injector, credential collection, autostart, antivirus disabling, firewall modification, packer or obfuscator. These are source-review statements, not an antivirus certificate. The DLL is unsigned; no vendor allowlisting or guarantee against antivirus alerts is claimed.
 
-Five entry signatures and four gate signatures are validated before installation. Both features have independent state validation/fail-stop. Necessary executable-memory operations remain because this is a runtime modification. The DLL is unsigned; no claim of vendor allowlisting is made.
-
-Before a false-positive submission, retain the original detected sample, exact detection name, file hash and product version. No sample has been submitted by this build workflow. Full corresponding project source, MinHook license/source, tests and build script are supplied in the Sources ZIP.
+Keep the original sample, exact detection name, hash and security-product version when reporting a suspected false positive. No sample was submitted to an antivirus vendor by this publication workflow. This repository contains project source/tests and MinHook with its original license, not game binaries, assets, dumps or player logs.

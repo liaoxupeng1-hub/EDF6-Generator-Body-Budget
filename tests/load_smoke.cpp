@@ -14,7 +14,7 @@ int wmain(int argc,wchar_t** argv){
  using Load=bool(*)(Info*);Load load=nullptr;std::memcpy(&load,&symbol,sizeof(load));
  if(load(nullptr))return 5;
  Info info{};
- if(!load(&info)||!info.name||info.infoVersion!=1||info.version.major!=0||info.version.minor!=2||info.version.patch!=0)return 6;
+ if(!load(&info)||!info.name||info.infoVersion!=1||info.version.major!=0||info.version.minor!=3||info.version.patch!=0)return 6;
  if(!load(&info))return 7;
  const auto folder=std::filesystem::path(argv[1]).parent_path(),log=folder/L"EDF6GeneratorBodyBudget.log";
  const bool expected=std::wstring(argv[2])==L"on";
@@ -22,9 +22,9 @@ int wmain(int argc,wchar_t** argv){
    if(std::filesystem::exists(log)){
      if(!expected)return 8;
      std::ifstream in(log,std::ios::binary);const std::string text((std::istreambuf_iterator<char>(in)),{});
-     if(text.find("DISABLED no_hooks=1")!=std::string::npos){std::puts("PASS: real EML6_Load 0.2.0; feature switches disabled; log on; no game loaded.");return 0;}
+     if(text.find("DISABLED no_hooks=1")!=std::string::npos){std::puts("PASS: real EML6_Load 0.3.0; feature switches disabled; log on; no game loaded.");return 0;}
    }Sleep(20);
  }
  if(expected)return 9;
- std::puts("PASS: real EML6_Load 0.2.0; feature switches disabled; log off; no log created; no game loaded.");return 0;
+ std::puts("PASS: real EML6_Load 0.3.0; feature switches disabled; log off; no log created; no game loaded.");return 0;
 }

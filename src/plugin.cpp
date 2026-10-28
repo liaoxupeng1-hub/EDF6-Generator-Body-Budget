@@ -30,7 +30,7 @@ static std::atomic<unsigned long> missionStarts{0};
 static HANDLE logFile=INVALID_HANDLE_VALUE;
 static SRWLOCK logLock=SRWLOCK_INIT;
 static uint64_t logBytes=0;
-static constexpr uint64_t LogLimit=1024*1024;
+static constexpr uint64_t LogLimit=2*1024*1024;
 
 static bool readBytes(P address,void* out,size_t size){
     if(!size)return true;
@@ -141,19 +141,20 @@ static bool hashFile(const wchar_t* path,std::array<uint8_t,32>& out){
     if(algorithm)BCryptCloseAlgorithmProvider(algorithm,0);
     CloseHandle(file);return ok;
 }
+}
+#include "egg_shells.hpp"
+namespace gb {
 static bool compatibleBytes(){
-    for(const auto& signature:target::signatures){
-        std::array<uint8_t,32> bytes{};
-        if(!readBytes(image+signature.rva,bytes.data(),bytes.size())||bytes!=signature.bytes)return false;
+    for(const auto& s:target::signatures){
+        const bool full=s.rva==0x1acb10||s.rva==0x1ba150||s.rva==0x1ba160;
+        if(!(full?config.full:config.budget))continue;
+        std::array<uint8_t,32> bytes{};if(!readBytes(image+s.rva,bytes.data(),32)||bytes!=s.bytes)return false;
     }
-    for(const auto& signature:gateSignatures){
-        std::array<uint8_t,32> bytes{};
-        if(!readBytes(image+signature.rva,bytes.data(),bytes.size())||bytes!=signature.bytes)return false;
-    }
-    return true;
+    if(config.budget)for(const auto& s:gateSignatures){std::array<uint8_t,32> bytes{};if(!readBytes(image+s.rva,bytes.data(),32)||bytes!=s.bytes)return false;}
+    return !egg::config.enabled||egg::compatibleBytes();
 }
 struct HookSpec{uint32_t rva;void* replacement;void** original;};
-static size_t selectHooks(std::array<HookSpec,4>& hooks){
+static size_t selectHooks(std::array<HookSpec,7>& hooks){
     size_t count=0;
     if(config.full){
         hooks[count++]={0x1acb10,reinterpret_cast<void*>(hookBegin),reinterpret_cast<void**>(&originalBegin)};
@@ -163,10 +164,15 @@ static size_t selectHooks(std::array<HookSpec,4>& hooks){
         hooks[count++]={0x6eed10,reinterpret_cast<void*>(hookRegister),reinterpret_cast<void**>(&originalRegister)};
         hooks[count++]={0x1baa20,reinterpret_cast<void*>(hookSetter),reinterpret_cast<void**>(&originalSetter)};
     }
+    if(egg::config.enabled){
+        hooks[count++]={egg::FactoryRva,reinterpret_cast<void*>(egg::hookFactory),reinterpret_cast<void**>(&egg::originalFactory)};
+        hooks[count++]={egg::ConstructRva,reinterpret_cast<void*>(egg::hookConstruct),reinterpret_cast<void**>(&egg::originalConstruct)};
+        hooks[count++]={egg::DestroyRva,reinterpret_cast<void*>(egg::hookDestroy),reinterpret_cast<void**>(&egg::originalDestroy)};
+    }
     return count;
 }
 static bool installHooks(){
-    std::array<HookSpec,4> hooks{};const size_t count=selectHooks(hooks);
+    std::array<HookSpec,7> hooks{};const size_t count=selectHooks(hooks);
     if(!count)return true;
     if(MH_Initialize()!=MH_OK)return false;
     size_t created=0;
@@ -189,14 +195,19 @@ static DWORD WINAPI worker(void*){
         wchar_t path[32768]={};if(!GetModuleFileNameW(selfModule,path,32768))return 0;
         std::wstring folder(path);folder.resize(folder.find_last_of(L"\\/")+1);
         config=loadConfig(folder+L"EDF6GeneratorBodyBudget.ini");
+        egg::config=egg::loadConfig(folder+L"EDF6GeneratorBodyBudget.ini");
         initializeLogging(folder);
-        message("START version=0.2.0 full=%u budget=%u logging=%u pid=%lu",unsigned(config.full),unsigned(config.budget),unsigned(config.logging),GetCurrentProcessId());
-        if(!config.full&&!config.budget){message("DISABLED no_hooks=1");return 0;}
+        message("START version=0.3.0 full=%u budget=%u logging=%u pid=%lu",unsigned(config.full),unsigned(config.budget),unsigned(config.logging),GetCurrentProcessId());
+        message("EGG_CONFIG enabled=%u max_shell_groups=%u shared_ant_and_e619=1",unsigned(egg::config.enabled),egg::config.maxGroups);
+        if(!config.full&&!config.budget&&!egg::config.enabled){message("DISABLED no_hooks=1");return 0;}
         for(const wchar_t* name:{L"EDF6BodyBudgetGateProbe.dll",L"EDF6MixedBodyBudgetProbe.dll",L"EDF6BodyBudgetProbe.dll",
             L"EDF6AntLegExit.dll",L"EDF6SingleLegExit.dll",L"EDF6BodyProbe.dll",L"EDF6AntLimbFilter.dll",L"EDF6AntZeroLimbs.dll",L"EDF6InsectZeroLimbs.dll"}){
             if(GetFileAttributesW((folder+name).c_str())!=INVALID_FILE_ATTRIBUTES||GetModuleHandleW(name)){
                 message("REFUSED conflicting_old_experiment=1");return 0;
             }
+        }
+        if(egg::config.enabled&&(GetFileAttributesW((folder+L"EDF6AntEggShellBudget.dll").c_str())!=INVALID_FILE_ATTRIBUTES||GetModuleHandleW(L"EDF6AntEggShellBudget.dll"))){
+            message("REFUSED standalone_egg_plugin_present=1 remove_EDF6AntEggShellBudget.dll_before_using_integrated_egg_feature=1");return 0;
         }
         HMODULE game=nullptr;
         for(int attempt=0;attempt<600&&!game;++attempt){game=GetModuleHandleW(L"EDF.dll");if(!game)Sleep(100);}
@@ -208,9 +219,9 @@ static DWORD WINAPI worker(void*){
         if(!compatibleBytes()){message("REFUSED game_entry_or_gate_modified=1");return 0;}
         nativeFull=reinterpret_cast<Unary>(image+0x1ba150);
         if(!installHooks()){message("REFUSED hook_installation_failed=1");return 0;}
-        message("READY Full_applied_on_original_mission_thread=1 original_game_budget_reclamation=1");
+        std::array<HookSpec,7> active{};message("READY version=0.3.0 hooks=%u full=%u budget=%u egg_shells=%u max_shell_groups=%u",unsigned(selectHooks(active)),unsigned(config.full),unsigned(config.budget),unsigned(egg::config.enabled),egg::config.maxGroups);
         // Initialization finishes here. No periodic worker or foreign-process access.
-    }catch(...){fullStopped=true;budgetStopped=true;message("INITIALIZATION_FAILED");}
+    }catch(...){fullStopped=true;budgetStopped=true;egg::stopped=true;message("INITIALIZATION_FAILED");}
     return 0;
 }
 }
@@ -219,7 +230,7 @@ struct PluginInfo{unsigned long infoVersion;const char* name;PluginVersion versi
 static_assert(sizeof(PluginInfo)==24);
 extern "C" __declspec(dllexport) bool EML6_Load(PluginInfo* info){
     if(!info)return false;
-    info->infoVersion=1;info->name="EDF6 Native Lightweight and Generator Body Budget";info->version={0,0,2,0};
+    info->infoVersion=1;info->name="EDF6 Corpse and Egg Shell Optimization";info->version={0,0,3,0};
     static std::atomic<bool> started{false};if(started.exchange(true))return true;
     HANDLE thread=CreateThread(nullptr,0,gb::worker,nullptr,0,nullptr);
     if(!thread){started=false;return false;}CloseHandle(thread);return true;

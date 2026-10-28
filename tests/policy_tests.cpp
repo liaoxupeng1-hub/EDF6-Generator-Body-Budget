@@ -32,6 +32,7 @@ static void begin(void* context){++beginCalls;contextSeen=context;beginOrder=++e
 static void light(void* context){++lightCalls;contextSeen=context;put<uint32_t>(P(state.data()),0x40,1);}
 static void registration(void* a,void* b,void* c){++regCalls;regA=a;regB=b;regC=c;}
 static void reset(uint32_t flags=0){
+    egg::config={false,false,32};
     config={true,true,false};fullStopped=false;budgetStopped=false;missionStarts=0;
     setCalls=fullCalls=beginCalls=lightCalls=regCalls=eventOrder=beginOrder=fullOrder=0;fullBehavior=budgetBehavior=0;
     state.fill(0);manager.fill(0);replacement.fill(0);
@@ -75,7 +76,7 @@ int wmain(int argc,wchar_t** argv){
     int context=11,controller=22,weak=33;
     for(bool f:{false,true})for(bool b:{false,true}){
         reset(0xa4);config.full=f;config.budget=b;
-        std::array<HookSpec,4> hooks{};CHECK(selectHooks(hooks)==size_t(2*unsigned(f)+2*unsigned(b)));
+        std::array<HookSpec,7> hooks{};CHECK(selectHooks(hooks)==size_t(2*unsigned(f)+2*unsigned(b)));
         hookBegin(&context);hookRegister(manager.data(),&controller,&weak);
         CHECK(beginCalls==1&&regCalls==1&&regA==manager.data()&&regB==&controller&&regC==&weak);
         CHECK(get(P(state.data())+0x40)==(f?2u:0u));CHECK(get(P(manager.data())+0x18)==(b?0xa5u:0xa4u));
@@ -105,7 +106,7 @@ int wmain(int argc,wchar_t** argv){
     CHECK(MH_CreateHook(reinterpret_cast<void*>(ownFunction),reinterpret_cast<void*>(ownHook),reinterpret_cast<void**>(&ownOriginal))==MH_OK);
     CHECK(MH_EnableHook(reinterpret_cast<void*>(ownFunction))==MH_OK);CHECK(call(2)==107);
     CHECK(MH_DisableHook(reinterpret_cast<void*>(ownFunction))==MH_OK);CHECK(call(2)==7);CHECK(MH_RemoveHook(reinterpret_cast<void*>(ownFunction))==MH_OK);
-    reset();std::array<HookSpec,4> hooks{};const auto count=selectHooks(hooks);auto memory=static_cast<uint8_t*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));CHECK(memory);
+    reset();std::array<HookSpec,7> hooks{};const auto count=selectHooks(hooks);auto memory=static_cast<uint8_t*>(VirtualAlloc(nullptr,4096,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));CHECK(memory);
     for(size_t i=0;i<count;++i){const target::Signature* signature=nullptr;for(const auto& item:target::signatures)if(item.rva==hooks[i].rva)signature=&item;CHECK(signature);std::memcpy(memory,signature->bytes.data(),32);void* trampoline=nullptr;CHECK(MH_CreateHook(memory,hooks[i].replacement,&trampoline)==MH_OK&&trampoline);CHECK(MH_RemoveHook(memory)==MH_OK);}
     CHECK(MH_Uninitialize()==MH_OK);VirtualFree(memory,0,MEM_RELEASE);VirtualFree(reinterpret_cast<void*>(image),0,MEM_RELEASE);
     std::cout<<"PASS "<<checks<<" checks: independent feature/config/log combinations, missing INI and key defaults, original-thread ordering, restart, native forwarding, flag preservation, fail-stop isolation, actual file-log switch/cap, signature rejection and four MinHook trampolines; no game loaded.\n";return 0;

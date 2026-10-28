@@ -1,3 +1,13 @@
+# 0.3.0 — 2026-10-28
+
+- Integrate the tested standalone ant egg-shell limiter into the existing plugin.
+- Add the E619 small squid egg break resource through the same verified GiantAntEgg/GiantAntEgg_Break path.
+- Add [EggShells] Enabled and MaxShellGroups. The shared cap defaults to 32 groups; zero skips all targeted shell groups when the feature is enabled.
+- Preserve original shell lifetimes and the native enemy-spawn branch; block excess groups before shell object creation.
+- Share one DLL, INI, startup worker, MinHook installation and optional bounded log. Detect the standalone egg-shell DLL to prevent duplicate loading.
+- Preserve the two original optimization switches. All three features can be configured independently.
+- Pass 2431 offline checks/assertions and two loader hosts. Author reported a substantial gameplay improvement; no fixed benchmark gain or exhaustive compatibility claim.
+
 # 0.2.0
 
 - 添加全关原生Full轻量模式，在任务加载路径应用，并保留早期设置/独立失败停止。
